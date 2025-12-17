@@ -1,6 +1,21 @@
-/* style.m3.css - Material Design 3 系統 */
+/* ==========================================================================
+   style.m3.css - Material Design 3 設計系統
+   說明：此檔案定義了全站的視覺風格，採用 CSS 變數 (Custom Properties) 管理
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. 全域變數系統 (:root)
+   設計邏輯：集中管理顏色、形狀與陰影，方便一鍵換膚或調整主題
+   -------------------------------------------------------------------------- */
 :root {
-  /* 顏色系統 */
+  /* [顏色系統] 
+     命名規則：--sys-color-{角色}
+     primary: 主色調 (亮藍色)
+     on-primary: 主色調上的文字顏色 (深色以確保對比度)
+     surface: 卡片或區塊的背景色
+     background: 整個頁面的底色
+     outline: 邊框顏色
+  */
   --md-sys-color-primary: #7dd3fc;
   --md-sys-color-on-primary: #00131b;
   --md-sys-color-background: #0c1115;
@@ -12,21 +27,29 @@
   --md-sys-color-outline: #899298;
   --md-sys-color-outline-variant: #3f484e;
   
-  /* 形狀系統 */
+  /* [形狀系統] 
+     定義不同元件的圓角半徑
+     Full 用於膠囊狀按鈕或圓形頭像
+  */
   --md-sys-shape-corner-small: 8px;
   --md-sys-shape-corner-medium: 12px;
   --md-sys-shape-corner-large: 16px;
   --md-sys-shape-corner-extra-large: 28px;
   --md-sys-shape-corner-full: 9999px;
   
-  /* 陰影系統 */
+  /* [陰影系統]
+     Elevation 1~3 代表不同的層級高度，數字越大陰影越深
+  */
   --md-sys-elevation-1: 0px 1px 2px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
   --md-sys-elevation-2: 0px 1px 2px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
   --md-sys-elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+/* --------------------------------------------------------------------------
+   2. 基礎重置 (Reset & Base)
+   -------------------------------------------------------------------------- */
 * {
-  box-sizing: border-box;
+  box-sizing: border-box; /* 確保 padding 不會撐大元素寬度 */
   margin: 0;
   padding: 0;
 }
@@ -34,11 +57,12 @@
 body {
   background-color: var(--md-sys-color-background);
   color: var(--md-sys-color-on-background);
-  font-family: system-ui, -apple-system, sans-serif;
-  line-height: 1.6;
+  font-family: system-ui, -apple-system, sans-serif; /* 使用系統原生字體以優化效能 */
+  line-height: 1.6; /* 增加行高提升閱讀體驗 */
   min-height: 100vh;
 }
 
+/* 布局容器：限制最大寬度並置中 */
 .container {
   width: 100%;
   max-width: 1200px;
@@ -46,24 +70,27 @@ body {
   padding: 0 1rem;
 }
 
-/* 頂部導航 */
+/* --------------------------------------------------------------------------
+   3. 頂部導航列 (App Bar)
+   -------------------------------------------------------------------------- */
 .app-bar {
-  position: sticky;
+  position: sticky; /* 黏性定位：滾動時固定在頂部 */
   top: 0;
   z-index: 1000;
   background-color: var(--md-sys-color-surface);
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px); /* 毛玻璃效果 (Glassmorphism) */
 }
 
 .app-bar__container {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: space-between; /* 左右推開 */
   height: 64px;
   padding: 0 1rem;
 }
 
+/* 品牌標題區域 */
 .brand__title {
   font-size: 1.25rem;
   font-weight: 700;
@@ -77,6 +104,7 @@ body {
   font-weight: 500;
 }
 
+/* 導航連結 */
 .navigation {
   display: flex;
   gap: 0.5rem;
@@ -89,55 +117,60 @@ body {
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all 0.2s ease; /* 平滑過渡效果 */
 }
 
 .navigation__link:hover {
   color: var(--md-sys-color-on-surface);
-  background-color: rgba(125, 211, 252, 0.08);
+  background-color: rgba(125, 211, 252, 0.08); /* 滑鼠懸停時的微亮背景 */
 }
 
 .navigation__link--active {
   color: var(--md-sys-color-on-surface);
-  background-color: rgba(125, 211, 252, 0.12);
+  background-color: rgba(125, 211, 252, 0.12); /* 當前頁面高亮 */
 }
 
-/* 卡片系統 */
+/* --------------------------------------------------------------------------
+   4. 卡片系統 (Card System) - 核心元件
+   -------------------------------------------------------------------------- */
 .card {
   background-color: var(--md-sys-color-surface);
   border-radius: var(--md-sys-shape-corner-large);
   border: 1px solid var(--md-sys-color-outline-variant);
   box-shadow: var(--md-sys-elevation-1);
-  overflow: hidden;
+  overflow: hidden; /* 確保圖片縮放時不超出圓角 */
   transition: all 0.3s ease;
-  height: 100%;
+  height: 100%; /* 強制等高 */
   display: flex;
   flex-direction: column;
 }
 
+/* 卡片懸停互動效果 */
 .card:hover {
   box-shadow: var(--md-sys-elevation-2);
-  border-color: var(--md-sys-color-primary);
-  transform: translateY(-2px);
+  border-color: var(--md-sys-color-primary); /* 邊框變亮 */
+  transform: translateY(-2px); /* 微微上浮 */
 }
 
+/* 媒體區塊 (圖片) */
 .card__media {
   position: relative;
-  aspect-ratio: 16/9;
+  aspect-ratio: 16/9; /* 固定 16:9 比例，防止版面跳動 */
   overflow: hidden;
 }
 
 .card__image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  transition: transform 0.6s ease;
+  object-fit: cover; /* 裁切圖片以填滿容器 */
+  transition: transform 0.6s ease; /* 圖片縮放動畫比卡片浮動慢一點，製造層次感 */
 }
 
 .card:hover .card__image {
-  transform: scale(1.05);
+  transform: scale(1.05); /* 懸停時圖片微放大 */
 }
 
+/* 圖片左上角的標籤 (Chip) */
 .media-chip {
   position: absolute;
   top: 12px;
@@ -160,21 +193,23 @@ body {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 1; /* 佔滿剩餘高度 */
   gap: 0.75rem;
 }
 
+/* 卡片標題 - 限制兩行 */
 .card__title {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--md-sys-color-on-surface);
   line-height: 1.3;
   margin: 0;
-  height: 2.6em;
+  height: 2.6em; /* 1.3 line-height * 2 lines */
   overflow: hidden;
   position: relative;
 }
 
+/* 純 CSS 截斷文字效果 (...) */
 .card__title.truncated::after {
   content: "...";
   position: absolute;
@@ -190,6 +225,7 @@ body {
   gap: 0.5rem;
 }
 
+/* 資訊小標籤 */
 .meta-chip {
   padding: 4px 10px;
   border-radius: var(--md-sys-shape-corner-full);
@@ -200,12 +236,13 @@ body {
   border: 1px solid var(--md-sys-color-outline);
 }
 
+/* 卡片描述 - 限制三行 */
 .card__description {
   color: var(--md-sys-color-on-surface-variant);
   font-size: 0.875rem;
   line-height: 1.6;
   margin: 0;
-  height: 4.8em;
+  height: 4.8em; /* 1.6 line-height * 3 lines */
   overflow: hidden;
   position: relative;
   flex: 1;
@@ -224,11 +261,13 @@ body {
   display: flex;
   justify-content: flex-end;
   padding-top: 1rem;
-  margin-top: auto;
+  margin-top: auto; /* 將按鈕推到底部 */
   border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 
-/* 按鈕 */
+/* --------------------------------------------------------------------------
+   5. 通用元件 (按鈕、網格、工具欄)
+   -------------------------------------------------------------------------- */
 .button {
   padding: 0.75rem 1.5rem;
   border-radius: var(--md-sys-shape-corner-full);
@@ -251,20 +290,20 @@ body {
 
 .button--primary:hover {
   background-color: #99ddfd;
-  box-shadow: 0 4px 12px rgba(125, 211, 252, 0.3);
+  box-shadow: 0 4px 12px rgba(125, 211, 252, 0.3); /* 發光效果 */
 }
 
-/* 網格系統 */
+/* 自適應網格 */
 .grid {
   display: grid;
   gap: 1.5rem;
 }
 
+/* 自動填充網格：最小 300px，剩餘空間平分 */
 .grid--auto {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
-/* 工具欄 */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -298,10 +337,12 @@ body {
   font-size: 0.875rem;
   color: var(--md-sys-color-on-surface-variant);
   line-height: 1.6;
-  max-width: 70ch;
+  max-width: 70ch; /* 限制每行字數以利閱讀 */
 }
 
-/* 搜索 */
+/* --------------------------------------------------------------------------
+   6. 表單元件 (搜尋與下拉)
+   -------------------------------------------------------------------------- */
 .search {
   display: flex;
   flex-direction: column;
@@ -329,7 +370,7 @@ body {
 .search__input:focus {
   outline: none;
   border-color: var(--md-sys-color-primary);
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2); /* 聚焦光暈 */
 }
 
 .select {
@@ -343,7 +384,9 @@ body {
   min-width: 160px;
 }
 
-/* 狀態 */
+/* --------------------------------------------------------------------------
+   7. 狀態顯示 (Loading Spinner)
+   -------------------------------------------------------------------------- */
 .status {
   text-align: center;
   padding: 3rem;
@@ -355,7 +398,7 @@ body {
   width: 40px;
   height: 40px;
   border: 3px solid var(--md-sys-color-outline);
-  border-top-color: var(--md-sys-color-primary);
+  border-top-color: var(--md-sys-color-primary); /* 頂部顏色不同造成旋轉視覺 */
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 1rem;
@@ -365,20 +408,23 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* 模態框 */
+/* --------------------------------------------------------------------------
+   8. 模態框 (Modal / Popup)
+   -------------------------------------------------------------------------- */
 .modal {
   position: fixed;
-  inset: 0;
+  inset: 0; /* top:0; right:0; bottom:0; left:0; */
   z-index: 2000;
   display: none;
   padding: 1rem;
-  overflow-y: auto;
+  overflow-y: auto; /* 內容過長時可滾動 */
 }
 
 .modal--open {
   display: block;
 }
 
+/* 背景遮罩 */
 .modal__backdrop {
   position: fixed;
   inset: 0;
@@ -404,6 +450,7 @@ body {
   overflow: hidden;
 }
 
+/* 彈窗滑入動畫 */
 @keyframes modalSlideIn {
   from {
     opacity: 0;
@@ -455,7 +502,7 @@ body {
 
 .modal__body {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 300px 1fr; /* 左側圖片，右側內容 */
   min-height: 600px;
 }
 
@@ -479,7 +526,9 @@ body {
   max-height: 70vh;
 }
 
-/* 閱讀器卡片 */
+/* --------------------------------------------------------------------------
+   9. 閱讀器樣式 (Modal 內部的卡片列表)
+   -------------------------------------------------------------------------- */
 .reader-section__title {
   font-size: 1.125rem;
   font-weight: 700;
@@ -522,11 +571,13 @@ body {
   color: var(--md-sys-color-on-surface-variant);
   font-size: 0.875rem;
   line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: pre-wrap; /* 保留換行符號 */
+  word-break: break-word; /* 防止長單字破版 */
 }
 
-/* 首頁專用樣式 */
+/* --------------------------------------------------------------------------
+   10. 首頁專用樣式 (Hero Section)
+   -------------------------------------------------------------------------- */
 .hero-section {
   margin: 2rem 0;
 }
@@ -560,6 +611,7 @@ body {
   position: relative;
 }
 
+/* 標題下方的漸層底線 */
 .section-title::after {
   content: '';
   position: absolute;
@@ -587,6 +639,7 @@ body {
   line-height: 1.6;
 }
 
+/* 自定義列表圓點 */
 .bullet-list__item::before {
   content: '';
   position: absolute;
@@ -622,7 +675,9 @@ body {
   line-height: 1.6;
 }
 
-/* 頁腳 */
+/* --------------------------------------------------------------------------
+   11. 頁腳與輔助類 (Utilities)
+   -------------------------------------------------------------------------- */
 .footer {
   border-top: 1px solid var(--md-sys-color-outline-variant);
   background-color: var(--md-sys-color-surface);
@@ -641,11 +696,12 @@ body {
   font-size: 0.875rem;
 }
 
-/* 輔助類 */
+/* 輔助類 utility classes */
 .text-center { text-align: center; }
 .text-primary { color: var(--md-sys-color-primary); }
 .text-secondary { color: var(--md-sys-color-on-surface-variant); }
 
+/* 間距類 (Margin Top/Bottom) */
 .mt-1 { margin-top: 0.5rem; }
 .mt-2 { margin-top: 1rem; }
 .mt-3 { margin-top: 1.5rem; }
@@ -653,18 +709,20 @@ body {
 .mb-3 { margin-bottom: 1.5rem; }
 .mb-4 { margin-bottom: 2rem; }
 
-/* 響應式 */
+/* --------------------------------------------------------------------------
+   12. 響應式調整 (Mobile Responsive)
+   -------------------------------------------------------------------------- */
 @media (max-width: 768px) {
   .app-bar__container {
     height: 56px;
   }
   
   .grid--auto {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr; /* 手機版改為單欄 */
   }
   
   .toolbar {
-    flex-direction: column;
+    flex-direction: column; /* 工具欄改為垂直排列 */
     align-items: stretch;
     gap: 1rem;
   }
@@ -695,11 +753,14 @@ body {
   }
   
   .modal__body {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr; /* 彈窗內容改為單欄 */
   }
 }
 
-/* 自定義滾動條 */
+/* --------------------------------------------------------------------------
+   13. 瀏覽器 UI 優化
+   -------------------------------------------------------------------------- */
+/* 自定義滾動條 (Webkit only) */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -718,11 +779,14 @@ body {
   background: var(--md-sys-color-outline);
 }
 
-/* 骨架載入動畫 */
+/* --------------------------------------------------------------------------
+   14. 骨架屏載入動畫 (Skeleton Loading)
+   -------------------------------------------------------------------------- */
 .skeleton {
   animation: skeleton-loading 1.5s infinite;
 }
 
+/* 掃光效果 (Shimmer effect) */
 .skeleton-media {
   background: linear-gradient(
     90deg,
@@ -762,24 +826,19 @@ body {
 }
 
 @keyframes skeleton-shine {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 @keyframes skeleton-loading {
-  0%, 100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
-  }
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
-/* 圖片佔位符 */
+/* --------------------------------------------------------------------------
+   15. 圖片處理與錯誤狀態
+   -------------------------------------------------------------------------- */
+/* 圖片載入失敗時的佔位符 */
 .card__image-placeholder {
   width: 100%;
   height: 100%;
@@ -793,12 +852,12 @@ body {
 }
 
 .card__image-placeholder::after {
-  content: '📄';
+  content: '📄'; /* 預設圖示 */
   font-size: 2rem;
   opacity: 0.5;
 }
 
-/* 圖片載入效果 */
+/* 懶載入漸顯效果 */
 .lazy-image {
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -808,7 +867,7 @@ body {
   opacity: 1;
 }
 
-/* 錯誤狀態 */
+/* 錯誤提示框 */
 .status-error {
   text-align: center;
   padding: 2rem;
@@ -818,7 +877,7 @@ body {
   border-left: 4px solid #ff5757;
 }
 
-/* 圖片載入過渡 */
+/* 圖片通用過渡 */
 .card__image {
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
@@ -827,7 +886,7 @@ body {
   transform: scale(1.05);
 }
 
-/* 批量載入的淡入效果 */
+/* 卡片批量載入的淡入動畫 */
 @keyframes fadeInUp {
   from {
     opacity: 0;

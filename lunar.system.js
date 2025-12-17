@@ -1,10 +1,20 @@
-// lunar.system.js - 完整響應式系統（修正圖片載入版）
+// ==========================================================================
+// lunar.system.js - 核心邏輯系統
+// 說明：此模組負責資料抓取、處理、DOM 操作與圖片載入邏輯
+// ==========================================================================
+
+// --------------------------------------------------------------------------
+// 1. Lunar 工具庫
+// 提供通用的輔助函式，與業務邏輯解耦
+// --------------------------------------------------------------------------
 const Lunar = {
-  state: {},
+  state: {}, // 全域狀態暫存
   
+  // 簡化 DOM 選擇器 (類似 jQuery)
   qs: (s, p = document) => p.querySelector(s),
-  qsa: (s, p = document) => [...p.querySelectorAll(s)],
+  qsa: (s, p = document) => [...p.querySelectorAll(s)], // 回傳陣列而非 NodeList
   
+  // 合併排序法 (Merge Sort) - 用於大量資料的穩定排序
   mergeSort: (arr, compare = (a, b) => a - b) => {
     if (arr.length <= 1) return arr;
     const mid = Math.floor(arr.length / 2);
@@ -19,16 +29,19 @@ const Lunar = {
     return [...merged, ...left.slice(i), ...right.slice(j)];
   },
   
+  // HTML 跳脫字元，防止 XSS 攻擊
   escape: str => String(str || '').replace(/[&<>"']/g, char => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;',
     '"': '&quot;', "'": '&#039;'
   }[char])),
   
+  // 文字格式化：將換行符號轉為 <br>
   formatText: (text, keepBreaks = false) => {
     const safe = Lunar.escape(String(text || ''));
     return keepBreaks ? safe.replace(/\n/g, '<br>') : safe;
   },
   
+  // 防抖動函式 (Debounce) - 用於搜尋輸入，避免每打一個字就觸發搜尋
   debounce: (fn, delay) => {
     let timer;
     return (...args) => {
@@ -38,49 +51,62 @@ const Lunar = {
   }
 };
 
+// --------------------------------------------------------------------------
+// 2. CardSystem 卡片系統核心
+// --------------------------------------------------------------------------
 const CardSystem = {
+  // [設定區] 請在此修改 Google Sheet ID 與欄位對應
   config: {
-    sheetId: '1CF9hUYU5Kowvv2j8Um3pJ1P21MHnoCCvIZwFhry7vps',
-    gid: 0,
-    imageDir: 'image/',
+    sheetId: '1CF9hUYU5Kowvv2j8Um3pJ1P21MHnoCCvIZwFhry7vps', // Google Sheet ID
+    gid: 0, // 工作表 ID (通常第一個是 0)
+    imageDir: 'image/', // 圖片存放路徑
     
+    // 欄位對映：[關鍵字, 中文備用名]
+    // 系統會自動在 Excel 標題列中模糊比對這些欄位
     fields: {
       title: ['TITLE', '標題'],
       body: ['BODY', '內容'],
       cover: ['COVER_BG_KEY', '封面'],
       chapter: ['CHAPTER', '章節'],
-      level: ['LEVEL', '層級']
+      level: ['LEVEL', '層級'] // 用於區分是「章節卡片」還是「子節點」
     }
   },
   
+  // [資料區] 執行時期的狀態
   data: {
-    raw: [],
-    chapters: new Map(),
-    searchIndex: new Map(),
-    fields: null,
-    cacheKey: 'cardSystem_cache',
-    cacheExpiry: 5 * 60 * 1000
+    raw: [],           // 原始 Excel 資料
+    chapters: new Map(), // 整理後的章節 Map
+    searchIndex: new Map(), // 搜尋索引
+    fields: null,      // 實際偵測到的欄位名稱
+    cacheKey: 'cardSystem_cache', // localStorage 鍵名
+    cacheExpiry: 5 * 60 * 1000    // 快取過期時間 (5分鐘)
   },
   
+  // DOM 元素快取
   dom: {},
   
+  // [初始化] 程式入口點
   async init() {
-    await this.setupDOM();
+    await this.setupDOM(); // 根據頁面建立 HTML 結構
+    
+    // 判斷是否為「卡片詳細頁」，只有詳細頁才需要載入大量資料
     const isDetailsPage = location.pathname.includes('details');
     
     if (isDetailsPage) {
-      await this.loadData();
-      this.bindEvents();
-      this.renderCards();
+      await this.loadData(); // 下載資料
+      this.bindEvents();     // 綁定互動事件
+      this.renderCards();    // 渲染卡片
     }
   },
   
+  // [建立 DOM] 根據頁面動態注入 HTML
   async setupDOM() {
     const app = Lunar.qs('#app');
     if (!app) return;
     
     const isDetailsPage = location.pathname.includes('details');
     
+    // 詳細頁面 (卡片庫) 的 HTML 結構
     if (isDetailsPage) {
       app.innerHTML = `
         <header class="app-bar">
@@ -136,6 +162,7 @@ const CardSystem = {
         </div>
       `;
     } else {
+      // 首頁 (Landing Page) 的 HTML 結構
       app.innerHTML = `
         <header class="app-bar">
           <div class="container app-bar__container">
@@ -204,6 +231,7 @@ const CardSystem = {
       `;
     }
     
+    // 綁定 DOM 元素到變數，方便後續操作
     this.dom = {
       app,
       modal: Lunar.qs('#modal'),
@@ -215,10 +243,12 @@ const CardSystem = {
     };
   },
   
+  // [載入資料] 從 Google Sheets 抓取
   async loadData() {
     this.showLoading(true);
     
     try {
+      // 1. 檢查快取 (LocalStorage)
       const cachedData = this.getCachedData();
       if (cachedData) {
         this.data.raw = cachedData.raw;
@@ -228,10 +258,12 @@ const CardSystem = {
         return;
       }
       
+      // 2. 設定逾時 Promise (8秒)
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('載入超時')), 8000);
       });
       
+      // 3. 建構 Google Visualization API URL (這是個技巧，不需 API Key 即可取得 JSON)
       const url = `https://docs.google.com/spreadsheets/d/${this.config.sheetId}/gviz/tq?tqx=out:json&gid=${this.config.gid}&tq=select *`;
       
       const fetchPromise = fetch(url).then(response => {
@@ -239,8 +271,10 @@ const CardSystem = {
         return response.text();
       });
       
+      // 4. 競速：看是資料先回來還是先逾時
       const text = await Promise.race([fetchPromise, timeoutPromise]);
       
+      // 5. 解析資料 (Google 回傳的 JSON 包在 google.visualization.Query.setResponse(...) 裡面，需擷取)
       const jsonText = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
       const data = JSON.parse(jsonText);
       
@@ -248,6 +282,7 @@ const CardSystem = {
       
       this.data.raw = this.parseSheetData(data.table);
       
+      // 6. 寫入快取
       this.cacheData({
         raw: this.data.raw,
         fields: this.detectFields(),
@@ -259,6 +294,7 @@ const CardSystem = {
     } catch (error) {
       console.error('資料載入失敗:', error);
       
+      // 如果失敗，嘗試讀取過期的快取當作備案
       const cachedData = this.getCachedData();
       if (cachedData) {
         this.data.raw = cachedData.raw;
@@ -274,6 +310,7 @@ const CardSystem = {
     }
   },
   
+  // 檢查快取是否有效
   getCachedData() {
     try {
       const cached = localStorage.getItem(this.data.cacheKey);
@@ -282,6 +319,7 @@ const CardSystem = {
       const data = JSON.parse(cached);
       const now = Date.now();
       
+      // 檢查是否過期
       if (now - data.timestamp > this.data.cacheExpiry) {
         localStorage.removeItem(this.data.cacheKey);
         return null;
@@ -301,6 +339,7 @@ const CardSystem = {
     }
   },
   
+  // 將 Google Sheets 的複雜結構轉換為簡單的物件陣列
   parseSheetData(table) {
     const cols = table.cols || [];
     const rows = table.rows || [];
@@ -313,6 +352,7 @@ const CardSystem = {
       
       for (let i = 0; i < labels.length; i++) {
         const cell = cells[i];
+        // v 是值 (value), f 是格式化後的文字 (formatted)
         obj[labels[i]] = cell ? (cell.v ?? cell.f ?? '') : '';
       }
       
@@ -320,6 +360,7 @@ const CardSystem = {
     });
   },
   
+  // [資料處理] 將原始資料分組為「章節」
   processData() {
     if (!this.data.raw.length) return;
     
@@ -336,15 +377,16 @@ const CardSystem = {
       const chapterName = (row[fields.chapter] || '未命名').trim();
       const level = fields.level ? (row[fields.level] || '').toLowerCase() : '';
       
+      // 如果這個章節還沒建立，先初始化結構
       if (!chapterMap.has(chapterName)) {
         chapterMap.set(chapterName, {
           name: chapterName,
           cards: [],
-          outerCards: [],
-          nodeCards: [],
+          outerCards: [], // 主要卡片
+          nodeCards: [],  // 子節點卡片
           total: 0,
-          heroCard: null,
-          searchText: ''
+          heroCard: null, // 用於代表該章節的封面卡片
+          searchText: ''  // 用於搜尋的字串索引
         });
       }
       
@@ -352,21 +394,25 @@ const CardSystem = {
       chapter.cards.push(row);
       chapter.total++;
       
+      // 將卡片內容加入搜尋索引
       chapter.searchText += ' ' + Object.values(row).join(' ');
       
+      // 分類：是節點還是主卡
       if (level === 'node') {
         chapter.nodeCards.push(row);
       } else {
         chapter.outerCards.push(row);
-        if (!chapter.heroCard) chapter.heroCard = row;
+        if (!chapter.heroCard) chapter.heroCard = row; // 第一張主卡當作封面
       }
     }
     
+    // 後處理：建立最終 Map
     chapterMap.forEach((chapter, name) => {
       if (!chapter.heroCard && chapter.cards.length > 0) {
         chapter.heroCard = chapter.cards[0];
       }
       
+      // 正規化搜尋文字 (轉小寫、去空白)
       chapter.searchText = chapter.searchText
         .toLowerCase()
         .replace(/\s+/g, '');
@@ -376,6 +422,7 @@ const CardSystem = {
     });
   },
   
+  // 自動偵測欄位名稱 (模糊比對)
   detectFields() {
     if (!this.data.raw.length) return {};
     
@@ -408,6 +455,7 @@ const CardSystem = {
     };
   },
   
+  // 切換 Loading 顯示狀態
   showLoading(isLoading) {
     if (!this.dom.statusBox) return;
     
@@ -426,7 +474,9 @@ const CardSystem = {
     }
   },
   
+  // 綁定 UI 事件
   bindEvents() {
+    // 搜尋輸入 (含防抖動)
     if (this.dom.search) {
       this.dom.search.addEventListener('input', Lunar.debounce(e => {
         Lunar.state.searchQuery = e.target.value.toLowerCase().trim();
@@ -434,6 +484,7 @@ const CardSystem = {
       }, 300));
     }
     
+    // 排序選單
     if (this.dom.sort) {
       this.dom.sort.addEventListener('change', e => {
         Lunar.state.sortMode = e.target.value;
@@ -441,6 +492,7 @@ const CardSystem = {
       });
     }
     
+    // 事件委派：處理動態生成的按鈕點擊
     document.addEventListener('click', e => {
       const openBtn = e.target.closest('.open-chapter');
       if (openBtn) {
@@ -455,6 +507,7 @@ const CardSystem = {
       }
     });
     
+    // 鍵盤 ESC 關閉 Modal
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && this.dom.modal?.classList.contains('modal--open')) {
         this.closeModal();
@@ -462,14 +515,17 @@ const CardSystem = {
     });
   },
   
+  // [渲染流程] 主入口
   renderCards() {
     if (!this.dom.cardsRoot) return;
     
-    this.showSkeleton();
+    this.showSkeleton(); // 先顯示骨架屏
     
+    // 使用 setTimeout 讓 UI 線程先繪製骨架屏，避免卡頓
     setTimeout(() => {
       let chapters = Array.from(this.data.chapters.values());
       
+      // 1. 搜尋過濾
       const query = Lunar.state.searchQuery || '';
       if (query) {
         chapters = chapters.filter(chapter => 
@@ -477,17 +533,21 @@ const CardSystem = {
         );
       }
       
+      // 2. 排序
       chapters = this.sortChapters(chapters, Lunar.state.sortMode);
       
+      // 3. 空狀態處理
       if (chapters.length === 0) {
         this.dom.cardsRoot.innerHTML = '<p class="text-center">找不到符合條件的卡片</p>';
         return;
       }
       
+      // 4. 開始批次渲染
       this.renderChaptersInBatch(chapters);
     }, 50);
   },
   
+  // 顯示骨架屏 (Skeleton)
   showSkeleton() {
     if (!this.dom.cardsRoot) return;
     
@@ -519,6 +579,7 @@ const CardSystem = {
     this.dom.cardsRoot.innerHTML = skeletonHTML;
   },
   
+  // [批次渲染] 解決大量 DOM 插入造成的卡頓
   renderChaptersInBatch(chapters, batchSize = 10) {
     let rendered = 0;
     
@@ -526,6 +587,7 @@ const CardSystem = {
       const batchEnd = Math.min(rendered + batchSize, chapters.length);
       const batch = chapters.slice(rendered, batchEnd);
       
+      // 第一批次時清空骨架屏
       if (rendered === 0) {
         this.dom.cardsRoot.innerHTML = '';
       }
@@ -546,8 +608,9 @@ const CardSystem = {
       this.dom.cardsRoot.appendChild(fragment);
       rendered = batchEnd;
       
-      this.loadImages();
+      this.loadImages(); // 觸發圖片載入動畫
       
+      // 如果還有下一批，用 setTimeout 排程到下一個 Event Loop
       if (rendered < chapters.length) {
         setTimeout(renderBatch, 50);
       }
@@ -556,16 +619,16 @@ const CardSystem = {
     renderBatch();
   },
   
+  // 監聽圖片載入事件，加上 loaded class 觸發淡入動畫
   loadImages() {
     const images = this.dom.cardsRoot.querySelectorAll('.card__image');
     
     images.forEach((img, index) => {
-      // 確保圖片載入完成後顯示
       img.onload = () => {
         img.classList.add('loaded');
       };
       
-      // 如果圖片已經載入（從快取），立即添加 loaded class
+      // 如果圖片從快取讀取 (已經 complete)，直接顯示
       if (img.complete) {
         img.classList.add('loaded');
       }
@@ -583,39 +646,34 @@ const CardSystem = {
     return chapters.sort(compare);
   },
   
+  // [核心] 圖片渲染與格式 fallback 邏輯
   renderImage(coverKey, alt, isLarge = false) {
-      // 1. 防呆：如果沒有 key，直接回傳佔位符
+      // 1. 防呆
       if (!coverKey) {
         return '<div class="card__image-placeholder"></div>';
       }
       
-      // 2. 檔名處理：取出純檔名，移除路徑和原本的副檔名
-      // 例如 "image/cover.jpg" 會變成 "cover"
+      // 2. 檔名處理：取出純檔名，移除路徑和副檔名
       let base = coverKey.replace(/^\/+/, '').split('?')[0].split('#')[0];
       const parts = base.split('/');
       let filename = parts[parts.length - 1];
       
-      // 移除舊的副檔名 (例如 .jpg)，這樣我們才能加上新的 .webp
       filename = filename.replace(/\.[^/.]+$/, '');
-      
-      // 處理中文檔名編碼，避免瀏覽器讀不懂
       filename = encodeURIComponent(decodeURIComponent(filename));
       
       if (!filename) {
         return '<div class="card__image-placeholder"></div>';
       }
 
-      // 3. 定義「候補清單」 (這就是您要的順位邏輯)
-      // 優先順序：WebP (最快) -> JPG (舊的) -> PNG (舊的) -> JPEG -> GIF
+      // 3. 定義「候補清單」：WebP (快) -> JPG -> PNG ...
       const extensions = ['webp', 'jpg', 'png', 'jpeg', 'gif'];
-      
-      // 產生所有可能的圖片路徑清單
       const imagePaths = extensions.map(ext => `${this.config.imageDir}${filename}.${ext}`);
       
       const className = isLarge ? 'modal__image' : 'card__image';
       
-      // 4. 生成 HTML (核心修改)
-      // 我們移除了 srcset，改用 onerror 搭配 data-index 來做「接力賽」
+      // 4. 生成 HTML (使用 onerror 進行遞迴嘗試)
+      // data-index 記錄目前試到第幾種格式
+      // onerror 邏輯：當目前格式失敗，就嘗試清單中的下一個
       return `
         <img src="${imagePaths[0]}" 
             class="${className}" 
@@ -623,23 +681,15 @@ const CardSystem = {
             loading="lazy"
             data-index="0"
             onerror="
-              // === 圖片載入失敗時的自動救援機制 ===
-              // 1. 取得剛剛定義的所有路徑清單
               const paths = ${JSON.stringify(imagePaths).replace(/"/g, "'")};
-              
-              // 2. 看現在試到第幾張了，準備試下一張
               let nextIndex = parseInt(this.dataset.index) + 1;
-              
-              // 3. 記錄新的進度
               this.dataset.index = nextIndex;
 
-              // 4. 如果還有下一張可以試，就換路徑
               if (nextIndex < paths.length) {
-                this.src = paths[nextIndex];
+                this.src = paths[nextIndex]; // 嘗試下一個格式
               } else {
-                // 5. 如果全部都試過了還是失敗，隱藏圖片並顯示佔位符
+                // 全部失敗：隱藏圖片並顯示佔位符
                 this.style.display = 'none';
-                // 防止 onerror 無限迴圈
                 this.onerror = null; 
                 if (this.parentElement) {
                   this.parentElement.innerHTML = '<div class=\'card__image-placeholder\'></div>';
@@ -649,6 +699,7 @@ const CardSystem = {
       `;
   },
   
+  // 生成單張卡片 HTML
   renderChapterCard(chapter) {
     const hero = chapter.heroCard;
     const fields = this.data.fields;
@@ -686,6 +737,7 @@ const CardSystem = {
     `;
   },
   
+  // 開啟詳細內容 Modal
   openModal(chapterName) {
     const chapter = this.data.chapters.get(chapterName);
     if (!chapter) return;
@@ -696,6 +748,7 @@ const CardSystem = {
     const title = hero?.[fields.title] || chapter.name;
     const cover = hero?.[fields.cover] || '';
     
+    // 注入 Modal 內容
     this.dom.modalPanel.innerHTML = `
       <div class="modal__header">
         <h3 class="modal__title">${Lunar.escape(chapter.name)}</h3>
@@ -712,6 +765,7 @@ const CardSystem = {
       </div>
     `;
     
+    // 注入 Meta 資訊
     const meta = Lunar.qs('#readerMeta', this.dom.modalPanel);
     if (meta) {
       meta.innerHTML = `
@@ -721,13 +775,14 @@ const CardSystem = {
       `;
     }
     
+    // 渲染卡片列表 (閱讀模式)
     const listContainer = Lunar.qs('#readerList', this.dom.modalPanel);
     if (listContainer) {
       this.renderModalCards(chapter, listContainer);
     }
     
     this.dom.modal.classList.add('modal--open');
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden'; // 防止背景滾動
   },
   
   renderModalCards(chapter, container) {
@@ -774,6 +829,7 @@ const CardSystem = {
     document.body.style.overflow = '';
   },
   
+  // 錯誤處理介面
   showError(message) {
     if (this.dom.statusBox) {
       this.dom.statusBox.innerHTML = `
@@ -787,10 +843,12 @@ const CardSystem = {
   }
 };
 
+// 確保 DOM 載入完成後再初始化
 document.addEventListener('DOMContentLoaded', () => {
   CardSystem.init().catch(console.error);
 });
 
+// 匯出模組供外部使用
 window.CardSystem = CardSystem;
 window.Lunar = Lunar;
 
